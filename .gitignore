@@ -1,0 +1,7 @@
+node_modules/
+source/qa/
+*.zip
+.DS_Store
+.env
+.env.*
+*.log
