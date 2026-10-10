@@ -1,0 +1,19 @@
+{
+  "name": "phoenix-decision-playground",
+  "version": "2.2.0",
+  "private": true,
+  "description": "Offline decision and facilitation exercises by Phoenix Chen, Agile Coach",
+  "author": "Phoenix Chen",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "node source/build.mjs",
+    "check": "node source/check.mjs && node source/expansion-check.mjs && node source/facilitation-check.mjs && node source/onboarding-check.mjs && node source/organizer-check.mjs",
+    "check:browser": "node source/browser-check.mjs && node source/expansion-browser-check.mjs && node source/facilitation-browser-check.mjs && node source/onboarding-browser-check.mjs && node source/organizer-browser-check.mjs && node source/edge-check.mjs && node source/portable-check.mjs",
+    "package": "node source/package.mjs"
+  },
+  "devDependencies": {
+    "jszip": "3.10.1",
+    "lucide": "1.8.0",
+    "playwright": "1.62.1"
+  }
+}
