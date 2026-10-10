@@ -1,0 +1,50 @@
+import assert from 'node:assert/strict';
+import {readFileSync,existsSync} from 'node:fs';
+import vm from 'node:vm';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+const dir=path.dirname(fileURLToPath(import.meta.url)),ctx=vm.createContext({});
+for(const name of ['games.js','expansion-data.js','facilitation-data.js','expansion-core.js','facilitation-core.js'])vm.runInContext(readFileSync(path.join(dir,name),'utf8'),ctx);
+const ids=JSON.parse(JSON.stringify(ctx.EXPANSION_DATA.scales.map(s=>s.id)));
+assert.deepEqual(ids,['solo','trio','small','midsize','scrum4','org125','org500'],'single and three-person scales join the existing flow');
+for(const s of ctx.EXPANSION_DATA.scales)assert.equal(s.process.reduce((n,row)=>n+row[1],0),s.minutes);
+for(const [scale,people] of [['solo',1],['trio',3]]){
+ const a=ctx.FACILITATION_CORE.newAssembly(scale);
+ assert.equal(a.people,people);assert.equal(a.groups.length,1);
+ assert.equal(ctx.FACILITATION_CORE.validateAssembly(a).people,people);
+ assert.throws(()=>ctx.FACILITATION_CORE.validateAssembly({...a,people:8,groups:[{...a.groups[0],people:8}]}));
+ const r=ctx.FACILITATION_CORE.recommend({theme:'annual',scale,minutes:60,authority:'full'});
+ assert.ok(r.warnings.some(x=>x.includes(scale==='solo'?'单人':'3人')));
+}
+assert.ok(existsSync(path.join(dir,'organizer-core.js')),'preparation core exists');
+vm.runInContext(readFileSync(path.join(dir,'organizer-core.js'),'utf8'),ctx);
+const c=ctx.ORGANIZER_CORE;
+let p=c.create('F4','trio');
+assert.equal(p.people,3);assert.equal(p.participants.length,3);
+assert.equal(p.participants[0].role,'引导师');
+assert.ok(!Object.hasOwn(p,'decisions'));assert.ok(!Object.hasOwn(p,'timer'));
+assert.ok(c.status(p).gaps.length>0,'a generated draft is not ready');
+assert.equal(c.validate(c.backup(p)).plan.title,p.title);
+for(const mode of ['hosted','rotating']){
+ const rows=c.participants('trio',mode);assert.equal(rows.length,3);
+ assert.ok(rows.map(r=>r.role).join(' ').includes(mode==='hosted'?'引导师':'轮换'));
+}
+const solo=c.create('E3','solo');assert.equal(solo.people,1);assert.equal(solo.participants.length,1);
+assert.ok(c.guidance(solo).includes('不能'));
+p.fields.purpose='校准一项共同约定';p.fields.authority='仅建议，不代表业务批准';
+p.fields.output='一项候选及待确认对象';p.fields.facts='公开事实与来源';
+p.fields.when='下周二';p.fields.place='会议室';p.fields.fallback='转纸面';
+p.participants.forEach((r,i)=>{r.name=`角色${i+1}`;r.authority='过程或条款权限待人工核实';});
+p.materials.forEach(m=>{m.owner='组织者';m.due='会前一天';m.ready=true;});
+p.checks.forEach(r=>{r.confirmed=true;r.note='已人工核对';});
+assert.equal(c.status(p).ready,true);
+p.minutes=1;assert.ok(c.status(p).gaps.some(g=>g.includes('时长')));
+p.minutes=60;
+const invalid=c.backup(p);invalid.plan.fields.extra='unknown';assert.throws(()=>c.validate(invalid));
+assert.throws(()=>c.validate({...c.backup(p),version:2}));
+const bad=c.backup(p);bad.plan.participants[0].name=1;assert.throws(()=>c.validate(bad));
+const raw=c.backup(p);raw.plan.fields.facts='a'.repeat(12001);assert.throws(()=>c.validate(raw));
+const poison=JSON.parse('{"format":"decision-playground-organizer","version":1,"plan":{},"__proto__":{}}');
+assert.throws(()=>c.validate(poison));
+const legacy=ctx.EXPANSION_CORE.empty();assert.equal(ctx.EXPANSION_CORE.validate(legacy).workshop,null);
+console.log('PASS organizer preparation: seven scales, solo/trio boundaries, agenda totals, separate backup, readiness and safe import');
